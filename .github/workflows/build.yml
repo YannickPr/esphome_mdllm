@@ -1,0 +1,41 @@
+name: build
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  schedule:
+    - cron: '0 5 * * 1'   # lundi 05:00 UTC
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive   # Option A (si sous-module)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Fetch upstream docs (Option B)
+        if: ${{ !contains(github.event.head_commit.message, '[submodule]') }}
+        run: ./scripts/fetch_esphome_docs.sh
+      - name: Build
+        run: python src/build_all_md.py
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: esphome-all
+          path: data/
+      - name: Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            data/esphome-all.md
+            data/esphome-all.txt
